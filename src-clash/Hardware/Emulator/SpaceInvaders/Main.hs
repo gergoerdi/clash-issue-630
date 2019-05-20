@@ -87,23 +87,23 @@ cpuIO :: CPU CPUIn CPUState CPUOut () -> Emu.CPU () -> EmuM ()
 cpuIO step emuStep = do
     (MkIOR{..}, MkEmuIOR{..}) <- ask
 
-    let newInstr s = case phase s of
-            Init -> True
-            Fetching _ buf -> isNothing (bufferLast buf)
-            _ -> False
+    (_, emuS, _) <- get
+    (_, emuS', _) <- lift $ runRWST emuStep emuR emuS
+    modify $ \(s, _, lastEvent) -> (s, emuS', lastEvent)
 
-    (s, emuS, _) <- get
-    when (newInstr s) $ do
-        (_, emuS', _) <- lift $ runRWST emuStep emuR emuS
-        modify $ \(s, _, lastEvent) -> (s, emuS', lastEvent)
+    let readyState s = case phase s of
+            Fetching False buf -> isNothing (bufferLast buf)
+            _ -> False
 
     let checkEvent thisEvent = do
             (s, emuS, lastEvent) <- get
             when (Just thisEvent /= lastEvent) $ do
                 ev <- lift $ takeTrace emuMemTrace
                 unless (ev == thisEvent) $ error $
-                  printf "\n%04x %s: %s\n%s\n%s\n" (pc s) (show $ instrBuf s) (show (thisEvent, ev)) (show s) (show emuS)
+                  printf "\n0x%04x %s: %s\n%s\n%s\n" (pc s) (show $ instrBuf s) (show (thisEvent, ev)) (show s) (show emuS)
                 modify $ \(s, emuS, _) -> (s, emuS, Just thisEvent)
+
+    fix $ \loop -> do
 
     cpuInMem <- do
         interrupting <- lift $ readIORef irqAck
@@ -124,10 +124,10 @@ cpuIO step emuStep = do
                   return irqInstr
               | otherwise -> do
                   x <- lift $ readData mem
-                  writing <- lift $ readIORef writing
-                  unless writing $ do
-                      Just addr <- lift $ peekAddress mem
-                      checkEvent $ ReadEvent addr x
+                  -- writing <- lift $ readIORef writing
+                  -- unless writing $ do
+                  --     Just addr <- lift $ peekAddress mem
+                  --     checkEvent $ ReadEvent addr x
                   return x
     cpuInIRQ <- lift $ do
         req <- readIORef irq
@@ -137,6 +137,7 @@ cpuIO step emuStep = do
                 return True
             _ -> return False
 
+    (s, _, _) <- get
     let (CPUOut{..}, s') = runState (runCPU defaultOut step CPUIn{..}) s
     modify $ \(_, emuS, lastEvent) -> (s', emuS, lastEvent)
 
@@ -155,8 +156,7 @@ cpuIO step emuStep = do
     lift $ writeIORef irqAck cpuOutIRQAck
     -- lift $ printf "<- %04x\n" (fromIntegral cpuOutMemAddr :: Word16)
 
-    unless (newInstr s') $ cpuIO step emuStep
-    return ()
+    unless (pc s' == Emu.pc emuS' && readyState s') loop
 
 mkPorts inputPorts = do
     shifter <- shifter
