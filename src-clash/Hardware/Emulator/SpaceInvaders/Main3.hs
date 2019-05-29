@@ -12,8 +12,8 @@ import Hardware.Emulator.SpaceInvaders.Event
 import Hardware.Emulator.SpaceInvaders.Input
 import Hardware.Emulator.Memory as Mem
 
-import Prelude ()
-import Clash.Prelude hiding ((!), delay, lift)
+-- import Prelude ()
+import Clash.Prelude hiding ((!), delay, lift, (^))
 import Cactus.Clash.CPU
 import Control.Monad.RWS
 import qualified Data.ByteString as BS
