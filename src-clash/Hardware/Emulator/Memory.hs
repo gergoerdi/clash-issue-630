@@ -1,6 +1,8 @@
 {-# LANGUAGE FlexibleContexts, RecordWildCards #-}
 module Hardware.Emulator.Memory where
 
+import Clash.Prelude
+import System.IO
 import Data.Array.IO
 import Control.Monad.Trans
 import Data.IORef
@@ -67,6 +69,6 @@ memTraced mem0 = do
         takeTrace = do
             tr <- readIORef trace
             -- print tr
-            writeIORef trace (init tr)
-            return $ last tr
+            writeIORef trace (L.init tr)
+            return $ L.last tr
     return (mem, MkMemTrace{..})
