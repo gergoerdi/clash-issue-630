@@ -2,7 +2,6 @@
 module Main where
 
 import Hardware.Intel8080
-import FetchM -- XXX
 import Hardware.Clash.Intel8080.CPU
 import qualified Hardware.Emulator.Intel8080.CPU as Emu
 import Hardware.Emulator.SpaceInvaders.Shifter
@@ -11,9 +10,10 @@ import Hardware.Emulator.SpaceInvaders.Event
 import Hardware.Emulator.SpaceInvaders.Input
 import Hardware.Emulator.Memory as Mem
 
-import Prelude ()
-import Clash.Prelude hiding ((!), delay, lift)
+import Prelude ((^))
+import Clash.Prelude hiding ((!), delay, lift, (^))
 import Cactus.Clash.CPU
+import Cactus.Clash.FetchM
 import Control.Monad.RWS
 import qualified Data.ByteString as BS
 import qualified Data.List as L
@@ -92,7 +92,7 @@ cpuIO step emuStep = do
     modify $ \(s, _, lastEvent) -> (s, emuS', lastEvent)
 
     let readyState s = case phase s of
-            Fetching False buf -> isNothing (bufferLast buf)
+            Fetching False buf -> bufferNext buf == 0
             _ -> False
 
     let checkEvent thisEvent = do
